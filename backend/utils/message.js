@@ -3,6 +3,8 @@
 export const message = {
     idNotFoundMessage: "Please provide user id'",
     userNotFoundMessage: "User not found",
+    userExistsMessage: "User already exists",
+    usernameExistsMessage: "Username already exists",
     userAlreadyVerifiedMessage: "User already verified",
     otpAttemptsExceededMessage: "Too many attempts. Please try again later",
     otpNotFoundMessage: "Please provide otp",
@@ -19,4 +21,6 @@ export const message = {
     userProfileFoundMessage: "User profile found",
     userProfileUpdatedMessage: "User profile updated successfully",
     userNotVerifiedMessage: "User not verified. Please verify your email",
+    imageMissingMessage : "Please provide image" , 
+    postCreatedMessage : "Post created successfully",
 }

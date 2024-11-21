@@ -5,44 +5,47 @@ import { message } from "../utils/message.js"
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import cloudinary from 'cloudinary'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let emailTemplate = fs.readFileSync(path.join(__dirname, '../templates/mail.html'), 'utf-8');
-
 export const registerUser = async (req, res) => {
     try {
         // Parsing body data
-        const { firstName, middleName, lastName, email, password, dob, mobile, bio, username, gender } = req.body
+        const { firstName, middleName, lastName, email, password, dob, mobile, username, gender, avatar } = req.body;
 
         // Checking the body data
         if(!firstName || !lastName || !email || !password || !dob || !mobile || !username || !gender) {
-            return res.status(400).json({
-                success: false,
-                message: 'Please provide all required fields'
-            })
+            return Response(res, 400, false, message.missingFieldsMessage);
         }
 
         // If user exists
         let user = await User.findOne({ email })
         if(user) {
-            return res.status(400).json({
-                success: false,
-                message: 'User already exists'
-            })
+            return Response(res, 400, false, message.userExistsMessage);
         }
 
         user = await User.findOne({ username })
         if(user) {
-            return res.status(400).json({
-                success: false,
-                message: 'Username already exists'
+            return Response(res, 400, false, message.usernameExistsMessage);
+        }
+
+        // Upload image in cloudinary
+        if(avatar) {
+            const result = await cloudinary.v2.uploader.upload(avatar, {
+                folder: 'avatars',
+                // width: 150,
+                // crop: "scale",
+                // height: 150
             })
+            req.body.avatar = {
+                public_id: result.public_id,
+                url: result.secure_url
+            }
         }
 
         // Create user
-
         user = await User.create({...req.body});
 
         const otp = Math.floor(100000 + Math.random() * 90000);
@@ -51,6 +54,9 @@ export const registerUser = async (req, res) => {
         user.otp = otp;
         user.otpExpire = otpExpire;
         await user.save();
+
+        // Email Template
+        let emailTemplate = fs.readFileSync(path.join(__dirname, '../templates/mail.html'), 'utf-8');
 
         // Email generation
         const subject = "Verify your account";
@@ -68,18 +74,10 @@ export const registerUser = async (req, res) => {
         });
 
         // Send response
-        res.status(201).json({
-            success: true,
-            message: 'User created successfully',
-            data: user
-        })
+        Response(res, 201, true, message.otpSendMessage, user._id);
         
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        })
-        // Responses(res, 500, false, error.message);
+        Response(res, 500, false, error.message);
     }
 }
 
@@ -226,6 +224,9 @@ export const resendOtp = async (req, res) => {
         user.otpAttemptsExpire = undefined;
         await user.save();
 
+        // Email Template
+        let emailTemplate = fs.readFileSync(path.join(__dirname, '../templates/mail.html'), 'utf-8');
+
         // Send otp
         const subject = "Verify your account";
         const body = `Your OTP is ${otp}`;
@@ -299,6 +300,9 @@ export const loginUser = async (req, res) => {
         const loginOtp = Math.floor(100000 + Math.random() * 900000);
         const loginOtpExpire = new Date(Date.now() + process.env.LOGIN_OTP_EXPIRE * 60 * 1000);
 
+        // Email Template
+        let emailTemplate = fs.readFileSync(path.join(__dirname, '../templates/mail.html'), 'utf-8');
+
         // Send otp
         const subject = "Verify your account";
         // const body = `Your OTP is ${otp}`;
@@ -323,20 +327,16 @@ export const loginUser = async (req, res) => {
         await user.save();
 
         // Send response
-        // Response(res, 200, true, message.otpSendMessage)
-        res.render("otp", {
-            id: user._id,
-        });
+        Response(res, 200, true, message.otpSendMessage, user._id)
 
         
     } catch (error) {
-        
+        Response(res, 500, false, error.message);
     }
 }
 
 export const verifyLoginOtp = async (req, res) => {
     try {
-        console.log("W1")
         // params and body
         const { id } = req.params;
         let { otp } = req.body;
@@ -431,7 +431,7 @@ export const resendLoginOtp = async (req, res) => {
         }
 
         // If user is not verified
-        if(!user.verified) {
+        if(!user.isVerified) {
             return Response(res, 400, false, message.userNotVerifiedMessage);
         }
 
@@ -445,6 +445,9 @@ export const resendLoginOtp = async (req, res) => {
         user.loginOtpAttempts = 0;
         user.loginOtpAttemptsExpire = undefined;
         await user.save();
+
+        // Email Template
+        let emailTemplate = fs.readFileSync(path.join(__dirname, '../templates/mail.html'), 'utf-8');
 
         // Send otp
         const subject = "Verify your account";
